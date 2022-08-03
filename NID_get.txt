@@ -1,0 +1,26 @@
+#!/bin/bash
+# Change Network ID for meters
+
+# Set up a log file for results
+DATE=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/NetworkIDGet_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo ==================== | tee -a $logFile
+echo Get meter network ID | tee -a $logFile
+echo ==================== | tee -a $logFile
+echo "" | tee -a $logFile
+
+arr=()
+
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for mac in ${arr[*]}
+do
+    networkID=$(net_mgr_wrapper.sh -d $mac conf mlme mlme_mac_net_id)
+    echo $mac $networkID
+done
+exit

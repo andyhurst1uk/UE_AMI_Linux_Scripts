@@ -1,0 +1,32 @@
+#!/bin/bash
+# Change Network ID for meters
+
+# Set up a log file for results
+DATE=`date +%Y.%m.%d__%H.%M.%S`
+logFile=~/amiTestLab/logs/NetworkID_${DATE}.txt
+
+echo "" | tee -a $logFile
+echo ================================ | tee -a $logFile
+echo Change meters to network 281     | tee -a $logFile
+echo ================================ | tee -a $logFile
+echo "" | tee -a $logFile
+
+arr=()
+
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterMacAddrChangeNetwork.txt
+
+for mac in ${arr[*]}
+do
+    cd ~
+    echo "Meter: $mac" | tee -a $logFile
+
+    echo "Changing meter to network 281"
+    change=$(./net_mgr -d $mac conf mlme mlme_mac_net_id 281)
+    
+    echo "Re-starting meter"
+    ./net_mgr -d $mac restart now
+done
+exit

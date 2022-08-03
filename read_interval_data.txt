@@ -1,0 +1,97 @@
+#!/bin/bash
+# Finds the interval data for a meter
+
+# Set start date for interval data	
+startDatePM=`date -d "$1 12:00 PM GMT+10:00" +%s`  # get the start time 
+endDatePM=`date -d "$2 12:00 PM GMT+10:00" +%s`    # get the end date
+endDateAM=$(expr $endDatePM + 43200)               # get the end date & add 12 hrs
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+startTimeCal=`date +%s`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/IntervalData_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo ===================================== | tee -a $logFile
+echo Find The Interval Data For AMI Meters | tee -a $logFile
+echo ===================================== | tee -a $logFile
+echo "" | tee -a $logFile ; echo "Test date: $startTime" | tee -a $logFile ; echo "" | tee -a $logFile
+
+# Set up variables for test summary;
+meterCount=0 ; meterPassed=0 ; meterTimeOut=0 ; meterNoSupport=0 ; chanTotal=0 ; chanpassed=0 ; chanTimeOut=0
+
+arr=() 
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+size=${#arr[@]}
+
+for mac in ${arr[*]}
+do
+    echo "Meter: $mac" | tee -a $logFile
+    echo "Interval data for: $1 to $2" | tee -a $logFile
+    meterCount=$(expr $meterCount + 1)
+    echo Meter $meterCount of $size | tee -a $logFile
+
+    for chan in 0 1 2 3 ; do
+        channel=$(expr $chan + 1) ; echo " " | tee -a $logFile 
+        echo Channel $channel | tee -a $logFile
+
+        for (( i = $endDateAM ; i >= $startDatePM ; i=i-43200 )) ; do
+            convertTime=$(date -u -d @${i}) ; echo $convertTime | tee -a $logFile
+
+            cd ~ 
+            intData=$(net_mgr_wrapper.sh -d $mac pri data parse_intervals ${i}:24:${chan})
+            if [ "$intData" != "Request timed out" ] && [ $(echo $intData | cut -d" " -f 17) != "not" ]
+            then        for num in {2..25} ; do
+                        int=$(echo $intData | cut -d"#" -f $num)
+                        echo $int | tee -a $logFile
+                    done
+            elif    [ "$intData" = "Request timed out" ] ; then
+                    echo $intData | tee -a $logFile
+                    if [ $chan = 0 ]
+                        then meterTimeOut=$(expr $meterTimeOut + 1)
+                    else
+                        chanTimeOut=$(expr $chanTimeOut = 1)
+                    fi
+                    break 2
+
+            elif    [ $(echo $intData | cut -d" " -f 17) = "not" ] ; then
+                    if [ $chan = 0 ]
+                        then echo Meter not supported | tee -a $logFile
+                        meterNoSupport=$(expr $meterNoSupport + 1)
+                    else echo No channel | tee -a $logFile
+                    fi
+                    break 2
+            fi
+        done
+        if [ $chan = 0 ]
+        then meterPassed=$(expr $meterPassed + 1)
+        fi
+        chanPassed=$(expr $chanPassed + 1)
+    done
+    echo "" | tee -a $logFile
+done
+
+# Section to display the test results
+echo TEST SUMMARY | tee -a $logFile
+echo Intervals are displayed in reverse chronological order | tee -a $logFile
+echo “------------“ | tee -a $logFile ; echo “ “ | tee -a $logFile
+endTime=`date +%Y.%m.%d__%H.%M.%S`
+endTimeCal=`date +%s`
+timeTaken=$(expr $endTimeCal - $startTimeCal)
+timePerMeter=$(expr $timeTaken / $meterPassed)
+echo Interval data for: JE2E $1 to $2 | tee -a $logFile
+echo Total meters: $meterCount | tee -a $logFile
+echo Meters passed: $meterPassed | tee -a $logFile
+echo Meters timed out: $meterTimeOut | tee -a $logFile
+echo Meters not supported: $meterNoSupport | tee -a $logFile
+echo Channels passed: $chanPassed | tee -a $logFile
+echo Channels timed out: $chanTimeOut | tee -a $logFile
+echo Start time: $startTime | tee -a $logFile
+echo End time: $endTime | tee -a $logFile
+echo Time taken: $timeTaken seconds | tee -a $logFile
+echo Time per meter: $timePerMeter seconds | tee -a $logFile 
+echo "" | tee -a $logFile 
+exit

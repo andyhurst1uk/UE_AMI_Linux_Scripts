@@ -1,0 +1,112 @@
+#!/bin/bash
+# Gets AP config settings
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/APConfigGet_${startTime}.txt
+errorLog=/app/ssn/net_mgr/secure/amiTestLab/logs/APConfigGetError_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo =================== | tee -a $logFile
+echo Get AP/Relay Config  | tee -a $logFile
+echo =================== | tee -a $logFile
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <apIpv6Addr
+
+for ap in ${arr[*]}
+do
+        echo "" | tee -a $logFile ; echo AP/Relay: $ap | tee -a $logFile
+        ping6=$(ping6 -c 3 $ap)
+        pingResult=$(echo $ping6 | cut -d" " -f38)
+        if [ "$pingResult" = "3" ]
+        then
+                echo "Ping6:         OK" | tee -a $logFile
+        else    echo Ping6: FAIL | tee -a $logFile
+                continue
+        fi
+
+
+        # Get the NIC time #################################################################
+        nicTime=$(net_mgr_wrapper.sh -d $ap time local)
+        if [ "$nicTime" = "Request timed out" ]
+                then  sleep 5
+                nicTime=$(net_mgr_wrapper2.sh -d $ap time local)
+        fi       
+        # Get the system time
+        server=$(expr `date +%s` + 36000)
+        # Calculate NIC time in seconds
+        nicTimeHMS=$(echo $nicTime | cut -d" " -f6)
+        nicTimeYY=$(echo $nicTime | cut -d" " -f17)
+        nicTimeDD=$(echo $nicTime | cut -d" " -f10)
+        nicTimeMM=$(echo $nicTime | cut -d" " -f15)
+        nicTimeSec=$(date -d "${nicTimeYY}-${nicTimeMM}-${nicTimeDD} ${nicTimeHMS}" +%s)
+        # Display the results
+        diff=$(expr $nicTimeSec - $server)
+        echo "Time Synch:    $diff secs" | tee -a $logFile
+        diff2=$diff
+        # Time synch diff; check if exists, remove .ve values, check scale of
+        if [ $diff2 -le 0 ] ;then diff2=$(($diff2 * -1 )) ; fi
+        if [ $diff2 -gt 10 ]
+                then
+                        #echo diff2 $diff2
+                        echo Time Synch: $diff secs | tee -a $ $logFile
+                        echo $nicTime | tee -a $logFile
+        fi
+
+        # Get network ID #################################################################
+        networkID=$(net_mgr_wrapper.sh -d $ap conf mlme mlme_mac_net_id)
+        networkID2=$(echo $networkID | cut -d" " -f7)
+        echo "Network ID:    $networkID2" | tee -a $logFile
+        # Get Blob Config ################################################################
+        dnsZone=$(net_mgr_wrapper2.sh -d $ap dns zone_get | cut -d" " -f4)
+        dnsServer=$(net_mgr_wrapper2.sh -d $ap dns server_get | cut -d" " -f4)
+        nmsTrapHost=$(net_mgr_wrapper2.sh -d $ap nm_trap host_get | cut -d" " -f4)
+        echo "DNS Zone:      $dnsZone" | tee -a $logFile
+        echo "DNS Server:    $dnsServer" | tee -a $logFile
+        echo NMS Trap Host: $nmsTrapHost | tee -a $logFile
+
+        # LPO ############################################################################
+        LPOff=$(net_mgr_wrapper2.sh -d $ap conf nm_sec disable_unsecure)
+        LPOff1=$(echo $LPOff | cut -d" " -f7)
+        echo "Legacy Port:   $LPOff1" | tee -a $logFile        
+        # PromMode #######################################################################
+        promMode=$(net_mgr_wrapper2.sh -d $ap conf mlme mlme_ignore_prom_net_id)
+        promMode2=$(echo $promMode | cut -d" " -f9)
+        echo "Prom Mode:     $promMode2" | tee -a $logFile
+
+        # Bcast Certs ####################################################################
+        bcast1=$(net_mgr_wrapper2.sh -d $ap certs sdump 4)
+                bcast2=$(echo $bcast1 | grep -o BROADCASTER)
+                if [ "$bcast2" != "BROADCASTER" ] ; then
+                        echo Broadcast Crt: None | tee -a $logFile
+                else
+                certDate=$(net_mgr_wrapper2.sh -d $ap certs sdump 4 |grep BROADCASTER|awk -F' ' '{print $5}')
+                        echo Broadcast Crt: OK | tee -a $logFile
+                        echo "Valid until:   $certDate" | tee -a $logFile
+                fi
+
+        # Get Blob Hash value ############################################################
+        hashValue=$(net_mgr_priv.sh -d $ap sysvar digest)
+        hashValue=$(net_mgr_priv.sh -d $ap sysvar digest)
+        hashValue2=$(echo $hashValue | cut -d" " -f5)
+        echo "Sysvar Digest: $hashValue2" | tee -a $logFile
+
+        # Get NIC Radio Power ############################################################
+        nicRadioPwr=$(net_mgr_wrapper2.sh -d $ap conf phy phy_pwr_out_900)
+        nicRadioPwr2=$(echo $nicRadioPwr | cut -d" " -f8-9)
+        echo NIC Radio Pwr: $nicRadioPwr2 | tee -a $logFile
+
+        # Get Routing Enabled ############################################################
+        routingEnabled=$(net_mgr_wrapper2.sh -d $ap conf srt on)
+        echo "Routing En:    $routingEnabled" | tee -a $logFile
+
+        # NIC Image ######################################################################
+        nicList=$(net_mgr_wrapper.sh -d $ap image list)
+        nic1=$(echo $nicList | cut -d" " -f5)
+        echo "NIC Image:     $nic1" | tee -a $logFile
+
+done
+exit

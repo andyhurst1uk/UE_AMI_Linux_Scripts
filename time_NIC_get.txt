@@ -1,0 +1,52 @@
+#!/bin/bash
+# Gets NIC time, & measures time difference with server time
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/TimeNicGet_${startTime}.txt
+errorLog=/app/ssn/net_mgr/secure/amiTestLab/logs/TimeNicGetError_${startTime}.txt
+
+echo "" | tee -a $logFile $errorLog
+echo ============= | tee -a $logFile $errorLog
+echo Get NIC Time  | tee -a $logFile $errorLog
+echo ============= | tee -a $logFile $errorLog
+echo "" | tee -a $logFile $errorLog
+echo "Meter                            Time difference" | tee -a $logFile $errorLog
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        # Get the NIC time
+        nicTime=$(net_mgr_wrapper.sh -d $meter time local)
+        if [ "$nicTime" = "Request timed out" ]
+                then  sleep 5
+                nicTime=$(net_mgr_wrapper.sh -d $meter time local)
+        fi
+        # Get the system time
+        server=$(expr `date +%s` + 36000)
+
+        # Calculate NIC time in seconds
+        nicTimeHMS=$(echo $nicTime | cut -d" " -f6)
+        nicTimeYY=$(echo $nicTime | cut -d" " -f17)
+        nicTimeDD=$(echo $nicTime | cut -d" " -f10)
+        nicTimeMM=$(echo $nicTime | cut -d" " -f15)
+        nicTimeSec=$(date -d "${nicTimeYY}-${nicTimeMM}-${nicTimeDD} ${nicTimeHMS}" +%s)
+
+        # Display the results
+        diff=$(expr $nicTimeSec - $server)
+        echo $meter $diff secs | tee -a $logFile
+        diff2=$diff
+        # Time synch diff; check if exists, remove .ve values, check scale of
+        if [ $diff2 -le 0 ] ;then diff2=$(($diff2 * -1 )) ; fi
+        if [ $diff2 -gt 20 ]
+                then
+                        #echo diff2 $diff2
+                        echo $meter $diff secs | tee -a $errorLog
+                        echo $nicTime | tee -a $errorLog
+        fi
+done
+exit

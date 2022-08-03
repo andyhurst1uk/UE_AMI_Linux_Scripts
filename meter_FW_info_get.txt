@@ -1,0 +1,57 @@
+#!/bin/bash
+# Finds meter firmware
+
+# Set up a log file for results
+DATE=`date +%Y.%m.%d__%H.%M.%S`
+logFile=~/amiTestLab/logs/MeterFW_${DATE}.txt
+
+echo "" | tee -a $logFile
+echo ================================ | tee -a $logFile
+echo Find The Firmware For AMI Meters | tee -a $logFile
+echo ================================ | tee -a $logFile
+echo "" | tee -a $logFile ; echo $DATE | tee -a $logFile ; echo "" | tee -a $logFile
+
+arr=()
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterMacAddr.txt
+
+for mac in ${arr[*]}
+do
+        echo "-----------------------------------------------------" $CL
+        echo "Meter: $mac" | tee -a $logFile; echo "" | tee -a $logFile
+        cd ~
+        nic=$(./net_mgr -d $mac image list)
+        if test "$nic" != ""
+                then    nic0=$(echo $nic | cut -d" " -f18-20)
+                        nic1=$(echo $nic | cut -d" " -f28-30)
+                        echo "$nic0" | tee -a $logFile
+                        echo "$nic1" | tee -a $logFile
+
+                        clem=$(./net_mgr -d $mac pri upgrade meter_list)
+                        clem0=$(echo $clem | cut -d" " –f7-9) 
+                        clem1=$(echo $clem | cut -d" " –f10-12) 
+                        echo "" | tee -a $logFile
+                        echo "$clem0" | tee -a $logFile
+                        echo "$clem1" | tee -a $logFile
+
+                        tariff=$(./net_mgr -d $mac pri data tariff get_active)
+                        active=$(echo $tariff | rev | cut -c1)
+                        tariffList=$(./net_mgr -d $mac pri data tariff get_list)
+
+                for num in {2..5}
+	                do
+                            new=$(echo $tariffList | cut -d[ -f$num | cut -c1)
+                            if [ $new = $active ] 
+                            then tar=$(echo $tariffList | cut -d[ -f$num | cut –c5-12)
+                                 echo "" | tee -a $logFile 
+                                 echo Tariff $tar | tee -a $logFile
+                                 break 1
+                            fi
+                        done 
+        fi
+
+    echo "" | tee -a $logFile
+done
+exit

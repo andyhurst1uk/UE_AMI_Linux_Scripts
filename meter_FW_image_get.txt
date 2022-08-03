@@ -1,0 +1,41 @@
+#!/bin/bash
+# Gets meter CLEM active & hidden from the file meterIpv6Addr
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/CLEMget_${startTime}.txt
+#errorLog=/app/ssn/net_mgr/secure/amiTestLab/logs/TimeMeterGet_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo =============== | tee -a $logFile
+echo Get Meter CLEM  | tee -a $logFile
+echo =============== | tee -a $logFile
+echo "" | tee -a $logFile
+
+printf  "Meter \t\t\t\t\tActive CLEM \tProd CLEM \tHidden CLEM \n" | tee -a $logFile
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        clemList=$(net_mgr_wrapper2.sh -d $meter pri upgrade meter_list)
+        clemActive=$(echo $clemList | cut -d" " -f9)
+        clemHidden=$(echo $clemList | cut -d" " -f12)
+
+        checkTariff=$(net_mgr_wrapper2.sh -d $meter pri data tariff get_list)
+        checkTariff2=$(echo $checkTariff | cut -d" " -f25 | cut -d"-" -f1)
+        case $checkTariff2 in
+                        "T1") prodClem="FSB2G14";;
+                        "T2") prodClem="FSB2G14";;
+                        "T3") prodClem="FSB7G02";;
+                        "T4") prodClem="FPC6G14";;
+                        "T5a") prodClem="FPC6G14";;
+                        "T5b") prodClem="FPC6G14";;
+                        "T6a") prodClem="FPC7G06";;
+                        "T6b") prodClem="FPC7G06";;
+        esac
+        printf  "$meter \t$clemActive \t$prodClem \t$clemHidden \n" | tee -a $logFile
+done
+exit

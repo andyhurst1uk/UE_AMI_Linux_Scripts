@@ -1,0 +1,51 @@
+#!/bin/bash
+# Gets meter time, & measures time difference with server time
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/TimeSyncGet_${startTime}.txt
+errorLog=/app/ssn/net_mgr/secure/amiTestLab/logs/TimeMeterGet_${startTime}.txt
+
+echo "" | tee -a $logFile $errorLog
+echo =============== | tee -a $logFile $errorLog
+echo Get Meter Time  | tee -a $logFile $errorLog
+echo =============== | tee -a $logFile $errorLog
+echo "" | tee -a $logFile $errorLog
+echo "Meter                            Time difference" | tee -a $logFile $errorLog
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        # Get the meter time
+        meterTime=$(net_mgr_wrapper2.sh -d $meter time pact)
+        # Get the system time
+        serverTime=`date +%H:%M:%S_%m:%d:%Y`
+        server=$(expr `date +%s` + 36000)
+
+        # Calculate meter time in seconds
+        meterTimeHMS=$(echo $meterTime | cut -d" " -f47)
+        meterTimeYY=$(echo $meterTime | cut -d" " -f48 | cut -d- -f3)
+        meterTimeDD=$(echo $meterTime | cut -d" " -f48 | cut -d- -f2)
+        meterTimeMM=$(echo $meterTime | cut -d" " -f48 | cut -d- -f1)
+        meterTimeSec=$(date -d "${meterTimeYY}-${meterTimeMM}-${meterTimeDD} $meterTimeHMS" +%s)
+        # Display the results
+        meterTime2=$(echo $meterTime | cut -d" " -f39-48 | tr - :)
+        diff=$(expr $meterTimeSec - $server)
+        echo $meter $diff secs | tee -a $logFile
+        
+        diff2=$diff
+        # Time synch diff; check if exists, remove .ve values, check scale of
+        if [ $diff2 -le 0 ] ;then diff2=$(($diff2 * -1 )) ; fi
+        if [ $diff2 -gt 20 ]
+                then
+                        #echo diff2 $diff2
+                        echo $meter $diff secs FAIL | tee -a $errorLog
+#                       echo "Time and Date on the servr (hh:mm:ss mm:dd:yy):" $serverTime UTC | tee -a $errorLog
+#                       echo $meterTime2 UTC+10 | tee -a $errorLog ; echo | tee -a $errorLog
+        fi
+done
+exit

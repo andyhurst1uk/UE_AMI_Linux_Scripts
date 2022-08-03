@@ -1,0 +1,46 @@
+#!/bin/bash
+# find NIC-hidden in Active meters contained in  meterMacAddr.txt
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/HiddenNIC_${startTime}.txt
+
+echo "" ; echo ""
+echo ================= | tee -a $logFile
+echo Hidden NIC images | tee -a $logFile
+echo ================= | tee -a $logFile ;echo "" | tee -a $logFile
+
+echo Hidden NIC exceptions assuming: | tee -a $logFile
+echo - the standard hidden NIC is 3.06.3 | tee -a $logFile
+echo - the active NIC is 3.08.1 | tee -a $logFile
+echo "" | tee -a $logFile
+
+arr=()
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        nicList=$(net_mgr_wrapper.sh -d $meter get_version_str)
+        nicList2=$(echo $nicList | cut -d"x" -f3-10)
+        for lines in $nicList2
+        do
+                nicList4=$(echo $lines | grep -o "nic.*-")
+                nicList5=$(echo $nicList4 | cut -c1-3)
+                if [ "$nicList5" = "nic" ]
+                then
+                        nicList6=$(echo $nicList4 | cut -c1-16)
+                        nicList7=$(echo $nicList4 | cut -c1-17)
+                        if [ "$nicList6" = "nic_3g.03.08.001" ]
+                        then output=ok
+                        elif [ "$nicList6" = "nic_3g.03.06.003" ]
+                        then output=ok
+                        else
+                                echo $meter has $nicList7 | tee -a $logFile
+                        fi
+                fi
+        done
+        echo "" | tee -a $logFile
+done
+exit

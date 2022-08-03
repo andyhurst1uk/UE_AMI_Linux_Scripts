@@ -1,0 +1,70 @@
+#!/bin/bash
+# Finds the current cumulative total for a meter
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/RegisterRead_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo ============================================= | tee -a $logFile
+echo Find The Cumulative Total Read For AMI Meters   | tee -a $logFile
+echo ============================================= | tee -a $logFile
+echo "" | tee -a $logFile
+date +%Y.%m.%d__%H.%M.%S | tee -a $logFile
+startTimeCal=`date +%s` ; meterCount=0
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for mac in ${arr[*]}
+do
+    echo "Meter: $mac" | tee -a $logFile
+    meterCount=$(expr $meterCount + 1)
+    cd ~ ; curRegRead=$(net_mgr_wrapper2.sh -d $mac pri data cur_reg_read)
+    if test "$curRegRead" != "Request timed out"
+        then
+        field=6
+        for chanNum in 1 2 3 4 ; do
+            chan=$(echo $curRegRead | cut -d":" -f $field)
+            if test "$chan" != ''
+            then chan1Hex=$(echo $chan | cut -d" " –f6)$(echo $chan | cut -d" " -f5)$(echo $chan | cut -d" " -f4)
+                chan1Dec=($((0x$chan1Hex)))
+
+                # check the multiplier
+                chanMult=$(echo $chan | cut -d" " -f8)
+                if [ $chanMult = 2f ] ; then
+                    chan1Dec=`echo $chan1Dec \* 0.1 |bc`      
+                fi
+                
+                # check the units
+                case $chanNum in
+                    "1") units="KWh";;
+                    "2") units="KWh or KVARh";;
+                    "3") units="KVARh";;
+                    "4") units="KVARh";;
+                esac   
+              
+                echo "Channel $chanNum $chan1Dec $units" | tee -a $logFile
+                field=$(expr $field + 1)
+            else break
+            fi
+        done
+     else    echo $curRegRead | tee -a $logFile
+
+     fi
+     echo "" | tee -a $logFile
+done
+
+# Section to display the test results
+echo TEST SUMMARY | tee -a $logFile
+echo “------------“ | tee -a $logFile ; echo “ “ | tee -a $logFile
+endTimeCal=`date +%s`
+timeTaken=$(expr $endTimeCal - $startTimeCal)
+timePerMeter=$(expr $timeTaken / $meterCount)
+echo Time taken: $timeTaken seconds | tee -a $logFile
+echo Total meters: $meterCount | tee -a $logFile
+echo Time per meter: $timePerMeter seconds | tee -a $logFile 
+
+exit

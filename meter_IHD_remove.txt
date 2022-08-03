@@ -1,0 +1,26 @@
+#!/bin/bash
+# Deletes Zigbee Devices from a meter
+
+echo " "
+echo Deleting zigbee devices on meter $meter
+echo --------------------------------------- ; echo " "
+
+cd ~
+remaingDevices=$(./net_mgr -d $1 zigbee cmd 256)
+
+for mac in $remaingDevices
+do	if [ $(echo $mac | cut -c1) = m ]
+		then	echo Deleting $mac
+    			cd ~
+    			./net_mgr -d $1 zigbee cmd 14 $mac
+			echo " "
+	fi
+done
+
+echo " "
+echo The Zigbee devices remaing on $1:
+cd ~
+remaingDevices=$(./net_mgr -d $1 zigbee cmd 256)
+echo $remaingDevices 
+echo Finished List ; echo " " 
+exit

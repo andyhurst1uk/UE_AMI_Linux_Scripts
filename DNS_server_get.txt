@@ -1,0 +1,36 @@
+#!/bin/bash
+# Get DNS Server, Zone & NMS Trap Host config values
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/BlobConfigGet_${startTime}.txt
+
+echo "" ; echo ""
+echo ====================== | tee -a $logFile
+echo Get Meter Blob Values | tee -a $logFile
+echo ====================== | tee -a $logFile ;echo "" | tee -a $logFile
+printf  "Meter \t\t\t\t\tDNS Zone \tDNS Server \t\tNMS Trap Host \n" | tee -a $logFile
+
+arr=()
+while read line
+do
+       arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        dnsZone=$(net_mgr_wrapper2.sh -d $meter dns zone_get)
+        dnsServer=$(net_mgr_wrapper2.sh -d $meter dns server_get)
+        nmsTrapHost=$(net_mgr_wrapper2.sh -d $meter nm_trap host_get)
+
+        dnsZone=$(net_mgr_wrapper2.sh -d $meter dns zone_get)
+        if [ "$dnsZone" != "Request timed out" ] ; then
+                dnsZone1=$(echo $dnsZone | cut -d" " -f4)
+                dnsServer=$(net_mgr_wrapper2.sh -d $meter dns server_get | cut -d" " -f4)
+                nmsTrapHost=$(net_mgr_wrapper2.sh -d $meter nm_trap host_get | cut -d" " -f4)
+                printf  "$meter \t$dnsZone1 \t$dnsServer \t$nmsTrapHost \n" | tee -a $logFile
+        else
+                echo $meter $dnsZone | tee -a $logFile
+        fi
+done
+exit

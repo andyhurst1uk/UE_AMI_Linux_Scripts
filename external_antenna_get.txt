@@ -1,0 +1,25 @@
+#!/bin/bash
+# Get meter external antenna setting from the file meterIpv6Addr
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/ExtAntennaGet_${startTime}.txt
+#errorLog=/app/ssn/net_mgr/secure/amiTestLab/logs/APConfigGetError_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo ============================= | tee -a $logFile
+echo Get Meter Ext Antenna Setting  | tee -a $logFile
+echo ============================= | tee -a $logFile
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        extAnt=$(net_mgr_wrapper.sh -d $meter conf ant ext_antenna_mask)
+        echo "$meter   $extAnt" | tee -a $logFile
+
+done
+exit

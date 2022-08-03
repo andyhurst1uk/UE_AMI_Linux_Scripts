@@ -1,0 +1,30 @@
+#!/bin/bash
+# find NIC-hidden in Active meters contained in  meterMacAddr.txt
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/NICImageImageList_${startTime}.txt
+
+echo "" ; echo ""
+echo ========================= | tee -a $logFile
+echo NIC Images Via Image List | tee -a $logFile
+echo ========================= | tee -a $logFile ; echo " " | tee -a $logFile
+arr=()
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        nicList=$(net_mgr_wrapper.sh -d $meter image list)
+        nic1=$(echo $nicList | cut -d" " -f5)
+        nic2=$(echo $nicList | cut -d" " -f20)
+        nic3=$(echo $nicList | cut -d" " -f30)
+        if [ "$nic1" = $nic2 ]
+        then
+                echo $meter $nic1 $nic3 | tee -a $logFile
+        else
+                echo $meter $nic1 $nic2 | tee -a $logFile
+        fi
+done
+exit

@@ -1,0 +1,37 @@
+#!/bin/bash
+# find Prom Mode for Active meters contained in  meterMacAddr.txt
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/PromModeGet_${startTime}.txt
+
+echo "" ; echo ""
+echo ==================== | tee -a $logFile
+echo Get Prom Mode Status | tee -a $logFile
+echo ==================== | tee -a $logFile ;echo "" | tee -a $logFile
+
+arr=()
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+echo "Meter                            Prom Mode" | tee -a $logFile
+
+for meter in ${arr[*]}
+do
+        promMode=$(net_mgr_wrapper2.sh -d $meter conf mlme mlme_ignore_prom_net_id)
+        promMode1=$(echo $promMode | cut -d" " –f9)
+
+        if [ "$promMode1" = "0" ]
+                then
+                echo $meter $promMode | tee -a $logFile
+              
+        elif [ "$promMode1" = "1" ]
+        then
+                echo $meter $promMode | tee -a $logFile
+                
+        else
+                echo $meter Timeout | tee -a $logFile
+                
+        fi
+done
+exit

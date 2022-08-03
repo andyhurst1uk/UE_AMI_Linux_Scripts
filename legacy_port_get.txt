@@ -1,0 +1,40 @@
+#!/bin/bash
+# find NIC-hidden in Active meters contained in  meterMacAddr.txt
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/LPOget_${startTime}.txt
+
+echo "" ; echo ""
+echo ====================== | tee -a $logFile
+echo Get Legacy Port Status | tee -a $logFile
+echo ====================== | tee -a $logFile ;echo "" | tee -a $logFile
+
+countON=0
+countOFF=0
+countNA=0
+
+arr=()
+while read line
+do
+        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+echo "Meter                            Legacy Port" | tee -a $logFile
+
+for meter in ${arr[*]}
+do
+        LPOff=$(net_mgr_wrapper2.sh -d $meter conf nm_sec disable_unsecure)
+        LPOff1=$(echo $LPOff | cut -d" " -f7)
+
+        if [ "$LPOff1" = "0" ]
+                then
+                echo $meter $LPOff1 | tee -a $logFile
+                countON=`expr $countON + 1`
+        elif [ "$LPOff1" = "1" ]
+        then
+                echo $meter $LPOff1 | tee -a $logFile
+                countOFF=`expr $countOFF + 1`
+        else
+                echo $meter Timeout | tee -a $logFile
+                countNA=`expr $countNA + 1`
+        fi
+done

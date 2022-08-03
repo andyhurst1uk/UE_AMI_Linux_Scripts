@@ -1,0 +1,88 @@
+#!/bin/bash
+# Re-sets meter time, & measures time difference after NIC re-start
+# for meters in the file meterMacAddr.txt
+
+# Set up a log file for results
+DATE=`date +%Y.%m.%d__%H.%M.%S`
+logFile=~/amiTestLab/logs/TimeSynch_${DATE}.txt
+band1=0 ; band2=0 ; band3=0 ; band4=0  ; tempFile=tempFile.txt ; chmod +x $tempFile ; macArray=()
+
+echo "" | tee -a $logFile
+echo ============================== | tee -a $logFile
+echo Synchronise NMS and AMI Meters | tee -a $logFile
+echo ============================== | tee -a $logFile
+echo "" | tee -a $logFile
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterMacAddr.txt
+
+for mac in ${arr[*]}
+do      echo "Meter: $mac" | tee -a $logFile
+        echo "Re-setting time on meter by 4 minuts seconds" | tee -a $logFile
+        cd ~
+        response=$(./net_mgr -d $mac time set_time off 240)
+        if [ "$response" = "Ok" ]
+        then    echo $response | tee -a $logFile
+                echo Restarting NIC card
+                ./net_mgr -d $mac restart now
+                echo $mac >> $tempFile
+        else    echo $response | tee -a $logFile
+        fi
+        echo "" | tee -a $logFile
+done
+
+echo Waiting 3 minutes for the NIC card re-start completion ; echo | tee -a $logFile
+sleep $(( 60 * 3 ))  &    # sleep
+sleep_pid=$! ; wait  $sleep_pid
+
+while read line
+do
+        mac=$line
+        # Get the meter time
+        cd ~ ; meterTime=$(./net_mgr -d $mac time pact)
+        # Get the system time
+        serverTime=`date +%H:%M:%S_%m:%d:%Y`
+        server=$(expr `date +%s` + 36000)
+
+        # Calculate meter time in seconds
+        meterTimeHMS=$(echo $meterTime | cut -d" " -f47)
+        meterTimeYY=$(echo $meterTime | cut -d" " -f48 | cut -d- -f3)
+        meterTimeDD=$(echo $meterTime | cut -d" " -f48 | cut -d- -f2)
+        meterTimeMM=$(echo $meterTime | cut -d" " -f48 | cut -d- -f1)
+        meterTimeSec=$(date -d "${meterTimeYY}-${meterTimeMM}-${meterTimeDD} $meterTimeHMS" +%s)
+
+        # Display the results
+        echo "Meter: $mac" | tee -a $logFile
+        meterTime2=$(echo $meterTime | cut -d" " -f39-48 | tr - :)
+        echo "Time and Date on the servr (hh:mm:ss mm:dd:yy):" $serverTime UTC | tee -a $logFile
+        echo $meterTime2 UTC+10 | tee -a $logFile
+        diff=$(expr $meterTimeSec - $server)
+        echo Time difference: $diff seconds | tee -a $logFile ; echo | tee 32 -a $logFile
+
+        # Time synch diff; check if exists, remove –ve values, check scale of
+        if [ $diff ]
+        then    if [ $diff -lt 0 ] ;then diff=$(($diff * -1 )) ; fi
+                if [ $diff -le 10 ]
+                then    band1=$(($band1 + 1))
+                elif [ $diff -gt 10 ] && [ $diff -le 20 ] ;then
+                        band2=$(($band2 + 1))
+                elif [ $diff -gt 20 ] && [ $diff -le 60 ] ;then
+                        band3=$(($band3 + 1))
+                        macArray+="$mac $diff sec, "
+                else [ $diff -gt 60 ]
+                        band4=$(($band4 + 1))
+                        macArray+="$mac $diff sec, "
+                fi
+        fi
+
+done < tempFile.txt
+echo "Meters < 10  seconds out of synch: $band1" | tee -a $logFile
+echo "Meters 10~20 seconds out of synch: $band2" | tee -a $logFile
+echo "Meters 20~60 seconds out of synch: $band3" | tee -a $logFile
+echo "Meters > 60  seconds out of synch: $band4" | tee -a $logFile; echo " " | tee -a $logFile
+echo Meters more than 20 sec out of synch: | tee -a $logFile
+echo ${macArray[*]} | tee -a $logFile ; echo " " | tee -a $logFile
+rm $tempFile
+exit

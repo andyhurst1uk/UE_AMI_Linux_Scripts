@@ -1,0 +1,40 @@
+#!/bin/bash
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/LANspeed_${startTime}.txt
+
+meter=fd42:e00b:a1df:2:213:5003:5c:26fe
+echo Meter: $meter | tee -a $logFile
+count=2
+min=1
+
+while [ $count -gt 0 ] ; do
+        startTimeCal=`date +%s`
+        meterStats=$(net_mgr_wrapper.sh -d $meter stat phy)
+        startTxBytes=$(echo $meterStats | cut -d" " -f37)
+        startRxBytes=$(echo $meterStats | cut -d" " -f40)
+
+        sleep $(( 60 * $min ))  &    # sleep
+        sleep_pid=$!
+        wait  $sleep_pid
+
+        endTimeCal=`date +%s`
+        meterStats=$(net_mgr_wrapper.sh -d $meter stat phy)
+        endTxBytes=$(echo $meterStats | cut -d" " -f37)
+        endRxBytes=$(echo $meterStats | cut -d" " -f40)
+
+        timeTaken=$(expr $endTimeCal - $startTimeCal)
+        totalTxBytes=$(expr $endTxBytes - $startTxBytes)
+        totalRxBytes=$(expr $endRxBytes - $startRxBytes)
+
+        txBytesPerSec=$(expr $totalTxBytes / $timeTaken)
+        rxBytesPerSec=$(expr $totalRxBytes / $timeTaken)
+
+        startTime=`date +%Y.%m.%d__%H.%M.%S`
+        echo $startTime | tee -a $logFile
+        echo Tx: $txBytesPerSec bytes/sec | tee -a $logFile
+        echo Rx: $rxBytesPerSec bytes/sec | tee -a $logFile
+        echo " " | tee -a $logFile
+
+        count=`expr $count - 1`
+done
+exit

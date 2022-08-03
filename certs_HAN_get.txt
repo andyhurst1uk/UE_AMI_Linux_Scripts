@@ -1,0 +1,26 @@
+#!/bin/bash
+# Get meter HAN Certs from the file meterIpv6Addr
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/HANCertGet_${startTime}.txt
+#errorLog=/app/ssn/net_mgr/secure/amiTestLab/logs/APConfigGetError_${startTime}.txt
+
+echo "" | tee -a $logFile
+echo =================== | tee -a $logFile
+echo Get Meter HAN Certs | tee -a $logFile
+echo =================== | tee -a $logFile
+
+arr=()
+while read line
+do        arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        hanCert=$(net_mgr_wrapper.sh -d $meter app_sysvar 391)
+        hanCert2=$(echo $hanCert | cut -d":" -f2-3)
+        printf  "$meter \t$hanCert2 \n" | tee -a $logFile
+
+done
+exit

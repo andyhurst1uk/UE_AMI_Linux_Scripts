@@ -1,0 +1,35 @@
+#!/bin/bash
+# Check sysvars on meters
+
+# Set up a log file for results
+DATE=`date +%Y.%m.%d__%H.%M.%S`
+logFile=~/amiTestLab/logs/SysVarDigest_${DATE}.txt
+arr=() ; sysVarDigestExpected=117:118:182:16:233:301:44:3:410
+
+echo "" | tee -a $logFile
+echo ================================ | tee -a $logFile
+echo Check the  sysvars of the meters | tee -a $logFile
+echo ================================ | tee -a $logFile
+echo "" | tee -a $logFile
+
+while read line ; do
+        arr=("${arr[@]}" $line)
+done <meterMacAddr.txt
+
+echo Testing for the following sysvars: | tee -a $logFile
+echo " " | tee -a $logFile
+
+for mac in ${arr[*]}
+do  
+    cd ~
+    sysVar3=$(./net_mgr -d $mac sysvar 3)
+    sysVarDigestActual=$(echo $sysVar3 | cut -d" " -f5)
+    echo "" | tee -a $logFile
+    echo Meter: $mac | tee -a $logFile
+
+    if [ "$sysVarDigestActual" = "$sysVarDigestExpected" ]
+            then echo OK | tee -a $logFile
+	else echo Sysvar $sysVarDigestActual no match | tee -a $logFile
+    fi
+done
+exit

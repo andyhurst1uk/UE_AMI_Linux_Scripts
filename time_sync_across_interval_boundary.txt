@@ -1,0 +1,70 @@
+#!/bin/bash
+# Check time synch not occur over interval boundary
+
+# Set up a log file for results
+DATE=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/TimeSynchBoundary_${DATE}.txt
+tempFile=tempFile.txt ; chmod +x $tempFile ; macArray=()
+
+echo "" | tee -a $logFile
+echo ====================================== | tee -a $logFile
+echo Synchronise Meter at Interval Boundary | tee -a $logFile
+echo ====================================== | tee -a $logFile
+echo "" | tee -a $logFile
+
+var1=1 ; var2=1
+txtrst=$(tput sgr0) ; txtred=$(tput setaf 1)
+
+echo Waiting for time xx:28 or xx:58...
+while [ $var1 = 1 ]
+do      startTime=`date +%Y.%m.%d.%H.%M.%S`
+        echo -ne .
+        minutes=$(echo $startTime | cut -d. -f5)
+
+        if [ $minutes = 27 ] || [ $minutes = 57 ]
+        then    echo Starting time synch
+                var1=0
+        fi
+        sleep $(( 10 * 1 ))  &    # sleep
+        sleep_pid=$! ; wait  $sleep_pid
+done
+
+echo Re-setting meter time by 4 minutes at $startTime
+cd ~
+response=$(net_mgr_wrapper2.sh -d $1 time set_time off 240)
+echo $response ; echo " "
+
+
+echo "Server    Meter     Difference"
+echo "Time      Time      (sec)" ; echo " "
+
+while [ $var2 = 1 ]
+do      # Capture meter & server times
+        cd ~ ; meterTime=$(net_mgr_wrapper2.sh -d $1 time pact)
+        serverHMS=`date +%H:%M:%S`
+        serverSec=$(expr `date +%s` + 36000)
+
+        # Calculate meter time in seconds
+        meterTimeHMS=$(echo $meterTime | cut -d" " -f47)
+        meterTimeYY=$(echo $meterTime | cut -d" " -f48 | cut -d- -f3)
+        meterTimeDD=$(echo $meterTime | cut -d" " -f48 | cut -d- -f2)
+        meterTimeMM=$(echo $meterTime | cut -d" " -f48 | cut -d- -f1)
+        meterTimeSec=$(date -d "${meterTimeYY}-${meterTimeMM}-${meterTimeDD} $meterTimeHMS" +%s)
+
+        # Display the results
+        diff=$(expr $meterTimeSec - $serverSec)
+        if [ $diff -gt 20 ] && [ $diff -le 200 ] ; then diff="${txtred}$diff sec ${txtrst}"; fi
+        echo "$serverHMS  $meterTimeHMS  $diff"
+
+        # See if test duration is complete
+        minute=$(echo $meterTime | cut -d: -f9)
+        if [ $minute = 09 ] || [ $minute = 39 ]
+        then    echo Stopping Test ; echo " "
+                var2=0
+        fi
+        sleep $(( 10 * 1 ))  &    # sleep
+        sleep_pid=$! ; wait  $sleep_pid
+done
+echo Test complete - Re-synchronising meter to NMS
+net_mgr_wrapper2.sh -d $1 restart now
+exit

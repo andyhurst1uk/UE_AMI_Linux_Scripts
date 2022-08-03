@@ -1,0 +1,47 @@
+#!/bin/bash
+# Get bact certs from active meters
+
+# Set up a log file for results
+startTime=`date +%Y.%m.%d__%H.%M.%S`
+logFile=/app/ssn/net_mgr/secure/amiTestLab/logs/BcastCertGet_${startTime}.txt
+#logFile=~/amiTestLab/logs/HiddenNIC_${startTime}.txt
+
+echo "" ; echo ""
+echo ====================== | tee -a $logFile
+echo Get Meter Bcast Certs | tee -a $logFile
+echo ====================== | tee -a $logFile ;echo "" | tee -a $logFile
+
+arr=()
+while read line
+do
+       arr=("${arr[@]}" $line)
+done <meterIpv6Addr
+
+for meter in ${arr[*]}
+do
+        # check meters are relevant for broadcasting
+        relevant=no
+        checkTariff=$(net_mgr_wrapper2.sh -d $meter pri data tariff get_list)
+        checkTariff2=$(echo $checkTariff | cut -d" " -f25 | cut -d"-" -f1)
+        case $checkTariff2 in
+                    "T2") relevant="yes";;
+                    "T3") relevant="yes";;
+                    "T5a") relevant="yes";;
+                    "T5b") relevant="yes";;
+        esac
+
+        echo $meter relevant: $relevant $checkTariff2 meter | tee -a $logFile
+
+        if [ $relevant = yes ] ; then
+                bcast1=$(net_mgr_wrapper2.sh -d $meter certs sdump 4)
+                bcast2=$(echo $bcast1 | grep -o BROADCASTER)
+                echo $bcast2 | tee -a $logFile
+                if [ "$bcast2" != "BROADCASTER" ] ; then
+                        echo $meter relevant: $relevant $checkTariff2 meter No Broadcast Cert| tee -a $logFile
+                else
+                certDate=$(net_mgr_wrapper2.sh -d $meter certs sdump 4 |grep BROADCASTER|awk -F' ' '{print $5}')
+                        echo $meter relevant: $relevant $checkTariff2 Broadcast Cert $certDate | tee -a $logFile
+                fi
+        fi
+done
+exit
